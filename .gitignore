@@ -1,0 +1,43 @@
+# SECRETS — NEVER commit
+.env
+.env.*
+*.pem
+*.key
+vault-token
+kubeconfig
+**/secrets.yaml
+
+# Terraform / OpenTofu
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+tfplan.binary
+**/tfplan.json
+
+# Go build artifacts
+services/*/bin/
+services/drift-engine/drift-engine
+services/compliance/compliance
+services/remediation/remediation
+*.test
+coverage.out
+
+# Python
+services/ml-predictor/venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+/tmp/X_train.npy
+/tmp/y_train.npy
+/tmp/scalers.pkl
+
+# Node / React
+dashboard/node_modules/
+dashboard/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
