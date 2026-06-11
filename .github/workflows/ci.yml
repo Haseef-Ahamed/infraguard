@@ -1,0 +1,94 @@
+name: InfraGuard CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  GO_VERSION: '1.22'
+  PYTHON_VERSION: '3.12'
+
+jobs:
+
+  lint-go:
+    name: Lint Go Services
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: golangci-lint
+        working-directory: services/drift-engine
+        run: |
+          go mod tidy
+          golangci-lint run ./... --timeout 5m
+
+  lint-python:
+    name: Lint Python
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: flake8
+        working-directory: services/ml-predictor
+        run: |
+          pip3 install flake8 --break-system-packages --quiet
+          flake8 src/ --max-line-length=120 --ignore=E501,W503
+
+  test-go:
+    name: Test Go Services
+    runs-on: self-hosted
+    needs: lint-go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Unit tests
+        working-directory: services/drift-engine
+        run: go test -v -race ./...
+
+  test-python:
+    name: Test Python
+    runs-on: self-hosted
+    needs: lint-python
+    steps:
+      - uses: actions/checkout@v4
+      - name: pytest
+        working-directory: services/ml-predictor
+        run: |
+          pip3 install pytest pytest-cov --break-system-packages --quiet
+          python3 -m pytest tests/ -v
+
+  validate-iac:
+    name: Validate IaC
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: tofu validate
+        working-directory: infra
+        run: |
+          tofu init -backend=false -input=false
+          tofu validate
+          tofu fmt -check -recursive
+
+  checkov-scan:
+    name: Checkov IaC Scan
+    runs-on: self-hosted
+    needs: validate-iac
+    steps:
+      - uses: actions/checkout@v4
+      - name: checkov
+        run: checkov -d infra/ --framework terraform --quiet --compact --soft-fail-on MEDIUM
+
+  secret-scan:
+    name: Gitleaks Secret Scan
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: gitleaks detect --source . --log-opts HEAD~1..HEAD --verbose
