@@ -41,6 +41,6 @@ module "s3" {
   environment = var.environment
 }
 
-output "vpc_id"            { value = module.vpc.vpc_id }
+output "vpc_id" { value = module.vpc.vpc_id }
 output "security_group_id" { value = module.security_groups.security_group_id }
-output "s3_bucket"         { value = module.s3.bucket_name }
+output "s3_bucket" { value = module.s3.bucket_name }
