@@ -1,4 +1,4 @@
-variable "vpc_id"      { type = string }
+variable "vpc_id" { type = string }
 variable "environment" { default = "dev" }
 
 resource "aws_security_group" "app_sg" {

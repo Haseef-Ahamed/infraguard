@@ -23,4 +23,4 @@ resource "aws_s3_bucket_versioning" "artifacts" {
 }
 
 output "bucket_name" { value = aws_s3_bucket.artifacts.bucket }
-output "bucket_arn"  { value = aws_s3_bucket.artifacts.arn }
+output "bucket_arn" { value = aws_s3_bucket.artifacts.arn }
