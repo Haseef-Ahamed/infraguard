@@ -1,0 +1,21 @@
+mode: set
+github.com/infraguard/drift-engine/pkg/state/comparator.go:17.34,19.2 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:28.23,30.29 2 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:30.29,32.3 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:34.2,35.30 2 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:35.30,37.14 2 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:37.14,38.12 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:41.3,41.97 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:41.97,52.4 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:54.3,54.95 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:54.95,65.4 1 0
+github.com/infraguard/drift-engine/pkg/state/comparator.go:67.2,67.15 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:75.23,83.25 3 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:83.25,94.3 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:96.2,96.15 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:100.82,101.31 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:101.31,103.3 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:104.2,104.31 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:104.31,106.3 1 1
+github.com/infraguard/drift-engine/pkg/state/comparator.go:107.2,107.33 1 0
+github.com/infraguard/drift-engine/pkg/state/comparator.go:111.51,114.2 2 1
