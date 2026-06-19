@@ -26,7 +26,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to create logger: %v\n", err)
 		os.Exit(1)
 	}
-	defer log.Sync()
+	defer func() { _ = log.Sync() }()
 
 	log.Info("InfraGuard Drift Detection Engine starting")
 
@@ -97,12 +97,10 @@ func main() {
 	// ── Comparator ───────────────────────────────────────────────────────────
 	comparator := state.NewComparator()
 
-	// ── Seed IaC baseline from current LocalStack state ──────────────────────
-	// On first run, take a snapshot of current state as the baseline.
-	// In production this would read from the Terraform state file in Git.
+	// ── Seed IaC baseline ────────────────────────────────────────────────────
 	log.Info("seeding IaC baselines from current cloud state")
 	if err := seedBaselines(ctx, detector, store, log); err != nil {
-		log.Warn("baseline seeding failed — drift detection may not work correctly", zap.Error(err))
+		log.Warn("baseline seeding failed", zap.Error(err))
 	}
 
 	// ── HTTP server for metrics + health ────────────────────────────────────
@@ -133,10 +131,8 @@ func main() {
 	scan := func() {
 		scanStart := time.Now()
 		log.Info("starting drift scan")
-
 		driftsFound := 0
 
-		// ── Security Groups ──────────────────────────────────────────────────
 		sgCtx, sgCancel := context.WithTimeout(ctx, 30*time.Second)
 		defer sgCancel()
 
@@ -147,19 +143,14 @@ func main() {
 			metrics.ResourcesMonitored.WithLabelValues("aws", "aws_security_group").
 				Set(float64(len(liveGroups)))
 
-			// Load baselines and compare
 			var baselineGroups []events.SecurityGroupState
 			for _, live := range liveGroups {
 				raw, err := store.GetLatestBaseline(ctx, live.GroupID)
 				if err != nil || raw == nil {
 					continue
 				}
-				// Convert raw map back to SecurityGroupState
-				// In Phase 3 we will replace this with proper IaC state parsing
 				baselineGroups = append(baselineGroups, events.SecurityGroupState{
 					GroupID: live.GroupID,
-					// Baseline loaded — use live as baseline for now
-					// Real baseline comparison wired in Phase 2 Part 4
 				})
 			}
 
@@ -182,7 +173,6 @@ func main() {
 						string(d.Severity), string(d.ChangeType),
 					).Inc()
 					metrics.DetectionLatency.Observe(detectionTime)
-
 					log.Info("drift event detected and published",
 						zap.String("resource_id", d.ResourceID),
 						zap.String("change_type", string(d.ChangeType)),
@@ -201,7 +191,6 @@ func main() {
 		)
 	}
 
-	// ── Run immediately on startup, then every 5 minutes ────────────────────
 	scan()
 
 	interval := 5 * time.Minute
@@ -216,7 +205,6 @@ func main() {
 
 	log.Info("polling loop started", zap.Duration("interval", interval))
 
-	// ── Signal handling ──────────────────────────────────────────────────────
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
@@ -233,8 +221,6 @@ func main() {
 	}
 }
 
-// seedBaselines takes a snapshot of current cloud state and stores it
-// as the IaC baseline. Called once on startup.
 func seedBaselines(ctx context.Context, detector *awscloud.Detector, store *state.Store, log *zap.Logger) error {
 	seedCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -250,19 +236,18 @@ func seedBaselines(ctx context.Context, detector *awscloud.Detector, store *stat
 			return err
 		}
 		if existing != nil {
-			continue // baseline already exists
+			continue
 		}
 		if err := store.UpsertBaseline(ctx, sg.GroupID, sg, "seed"); err != nil {
-			log.Warn("failed to seed baseline", zap.String("group_id", sg.GroupID), zap.Error(err))
+			log.Warn("failed to seed baseline",
+				zap.String("group_id", sg.GroupID), zap.Error(err))
 		} else {
 			log.Info("seeded baseline", zap.String("resource_id", sg.GroupID))
 		}
 	}
-
 	return nil
 }
 
-// getEnv returns the environment variable value or the default
 func getEnv(key, defaultVal string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

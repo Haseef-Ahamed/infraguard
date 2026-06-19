@@ -12,8 +12,7 @@ type Publisher struct {
 	nc *nats.Conn
 }
 
-// NewPublisher connects to NATS at the given URL.
-// It retries connection automatically on disconnect.
+// NewPublisher connects to NATS at the given URL
 func NewPublisher(url string) (*Publisher, error) {
 	nc, err := nats.Connect(url,
 		nats.RetryOnFailedConnect(true),
@@ -27,7 +26,6 @@ func NewPublisher(url string) (*Publisher, error) {
 }
 
 // Publish serialises the DriftEvent to JSON and publishes it
-// to the infraguard.drift.detected NATS subject.
 func (p *Publisher) Publish(event *DriftEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
@@ -42,7 +40,9 @@ func (p *Publisher) Publish(event *DriftEvent) error {
 // Close gracefully shuts down the NATS connection
 func (p *Publisher) Close() {
 	if p.nc != nil {
-		p.nc.Drain()
+		// Drain flushes pending messages before closing
+		// Error is intentionally ignored on shutdown path
+		_ = p.nc.Drain()
 	}
 }
 
