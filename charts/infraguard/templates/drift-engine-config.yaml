@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: drift-engine-config
+  namespace: drift-engine
+data:
+  VAULT_ADDR: "http://172.19.0.1:8200"
+  VAULT_TOKEN: "root"
+  METRICS_ADDR: ":8080"
+  SCAN_INTERVAL_SECONDS: "300"
