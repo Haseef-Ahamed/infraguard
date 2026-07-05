@@ -24,7 +24,7 @@ jobs:
         working-directory: services/drift-engine
         run: |
           go mod tidy
-          golangci-lint run ./... --timeout 5m
+          golangci-lint run ./... --timeout 10m
 
   lint-python:
     name: Lint Python
@@ -48,7 +48,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
       - name: Unit tests
         working-directory: services/drift-engine
-        run: go test -v -race ./...
+        run: go test -v -race -timeout 120s ./...
 
   test-python:
     name: Test Python
@@ -89,7 +89,6 @@ jobs:
             --soft-fail-on HIGH \
             --soft-fail-on MEDIUM \
             --skip-check CKV_AWS_382,CKV2_AWS_5,CKV2_AWS_11,CKV2_AWS_12,CKV2_AWS_61,CKV2_AWS_62,CKV_AWS_18,CKV_AWS_144,CKV_AWS_145
-
 
   secret-scan:
     name: Gitleaks Secret Scan
