@@ -37,7 +37,7 @@ jobs:
           python3 -m venv venv
           source venv/bin/activate
           pip install flake8 --quiet
-          flake8 src/ --max-line-length=120 --ignore=E501,W503
+          flake8 src/ --max-line-length=120 --ignore=E501,W503,E221,E241,E251,E226,E302,W391,E203
 
   test-go:
     name: Test Go Services

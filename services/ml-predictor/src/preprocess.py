@@ -24,14 +24,15 @@ FEATURES = [
     "time_of_day_cos",
     "day_of_week",
 ]
-LABEL    = "drift_occurred"
-SEQ_LEN  = 60    # 60 × 5 min = 5 hours of lookback
-PRED_STEP = 6    # predict 30 minutes ahead (6 × 5 min)
+LABEL = "drift_occurred"
+SEQ_LEN = 60  # 60 × 5 min = 5 hours of lookback
+PRED_STEP = 6  # predict 30 minutes ahead (6 × 5 min)
 
 
 def load_from_timescaledb(host: str = "localhost", port: int = 5433) -> pd.DataFrame:
     conn = psycopg2.connect(
-        host=host, port=port,
+        host=host,
+        port=port,
         database="infraguard_ts",
         user="infraguard",
         password="infraguard_dev",
@@ -64,16 +65,12 @@ def create_sequences(
     Creates (SEQ_LEN, n_features) sliding windows for one cluster.
     Returns X, y, and the fitted scaler for this cluster.
     """
-    cluster_df = (
-        df[df["cluster_id"] == cluster_id]
-        .sort_values("time")
-        .reset_index(drop=True)
-    )
+    cluster_df = df[df["cluster_id"] == cluster_id].sort_values("time").reset_index(drop=True)
 
     X_raw = cluster_df[FEATURES].values.astype(np.float32)
     y_raw = cluster_df[LABEL].values.astype(np.float32)
 
-    scaler  = MinMaxScaler(feature_range=(0, 1))
+    scaler = MinMaxScaler(feature_range=(0, 1))
     X_scaled = scaler.fit_transform(X_raw)
 
     X_seqs, y_seqs = [], []
@@ -98,14 +95,18 @@ def prepare_all_clusters(
         scalers[cid] = scaler
         log.info(
             "Cluster %s: %d sequences, positive rate=%.2f%%",
-            cid, len(X), y.mean() * 100,
+            cid,
+            len(X),
+            y.mean() * 100,
         )
 
     X_all = np.vstack(Xs)
     y_all = np.concatenate(ys)
     log.info(
         "Combined: X=%s y=%s positive_rate=%.2f%%",
-        X_all.shape, y_all.shape, y_all.mean() * 100,
+        X_all.shape,
+        y_all.shape,
+        y_all.mean() * 100,
     )
     return X_all, y_all, scalers
 

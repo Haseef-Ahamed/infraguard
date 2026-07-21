@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
 
 ARTIFACT_DIR = os.path.expanduser("~/infraguard/services/ml-predictor/mlflow-artifacts")
-MODEL_NAME   = "infraguard-drift-predictor"
+MODEL_NAME = "infraguard-drift-predictor"
 
 
 def promote_latest_to_production():

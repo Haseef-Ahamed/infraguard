@@ -21,34 +21,35 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
 
 # ── Constants ────────────────────────────────────────────────────────────────
-DAYS            = 30
-INTERVAL_MINS   = 5
-POINTS_PER_DAY  = 24 * 60 // INTERVAL_MINS   # 288
-TOTAL_POINTS    = DAYS * POINTS_PER_DAY       # 8640
-TARGET_DRIFT_RATE = 0.15   # 15% positive class rate
+DAYS = 30
+INTERVAL_MINS = 5
+POINTS_PER_DAY = 24 * 60 // INTERVAL_MINS  # 288
+TOTAL_POINTS = DAYS * POINTS_PER_DAY  # 8640
+TARGET_DRIFT_RATE = 0.15  # 15% positive class rate
+
 
 # ── Feature engineering helpers ──────────────────────────────────────────────
 def business_hour_factor(ts: datetime) -> float:
     """Returns activity multiplier based on time of day and day of week."""
-    hour    = ts.hour
+    hour = ts.hour
     weekday = ts.weekday()
 
-    if weekday >= 5:                     # Weekend
+    if weekday >= 5:  # Weekend
         return 0.25
-    if 9 <= hour <= 11:                  # Morning standup / sprint
+    if 9 <= hour <= 11:  # Morning standup / sprint
         return 1.2
-    if 14 <= hour <= 17:                 # Afternoon deployment window
+    if 14 <= hour <= 17:  # Afternoon deployment window
         return 1.4
-    if 18 <= hour <= 20:                 # EOD hotfixes
+    if 18 <= hour <= 20:  # EOD hotfixes
         return 0.9
-    if 22 <= hour or hour <= 6:          # Night
+    if 22 <= hour or hour <= 6:  # Night
         return 0.15
     return 0.7
 
 
 def maintenance_window(ts: datetime) -> bool:
     """Returns True if timestamp falls in a weekly maintenance window."""
-    return ts.weekday() == 2 and 2 <= ts.hour <= 4   # Wednesday 02:00–04:00
+    return ts.weekday() == 2 and 2 <= ts.hour <= 4  # Wednesday 02:00–04:00
 
 
 def generate_cluster(
@@ -73,14 +74,14 @@ def generate_cluster(
     """
     np.random.seed(abs(hash(cluster_id)) % (2**32))
 
-    records      = []
+    records = []
     deploy_count = 0.0
-    recent_chgs  = 0.0
+    recent_chgs = 0.0
 
     for i in range(TOTAL_POINTS):
-        ts  = start + timedelta(minutes=INTERVAL_MINS * i)
+        ts = start + timedelta(minutes=INTERVAL_MINS * i)
         bhf = business_hour_factor(ts)
-        mw  = maintenance_window(ts)
+        mw = maintenance_window(ts)
 
         # Simulate deployment events
         if np.random.random() < 0.015 * bhf:
@@ -88,25 +89,21 @@ def generate_cluster(
         deploy_count = max(0.0, deploy_count - 0.08)
 
         # Change frequency — spikes after deployments and during maintenance
-        base_cf    = 0.4 * bhf + deploy_count * 0.35 + (2.0 if mw else 0.0)
+        base_cf = 0.4 * bhf + deploy_count * 0.35 + (2.0 if mw else 0.0)
         recent_chgs = 0.88 * recent_chgs + np.random.poisson(max(0, base_cf))
 
         # CPU utilisation
         cpu = np.clip(
-            30 * bhf
-            + 18 * np.sin(i * 0.04)
-            + deploy_count * 8
-            + np.random.normal(0, noise * 22),
-            0, 100,
+            30 * bhf + 18 * np.sin(i * 0.04) + deploy_count * 8 + np.random.normal(0, noise * 22),
+            0,
+            100,
         )
 
         # Memory pressure
         mem = np.clip(
-            38 * bhf
-            + 14 * np.sin(i * 0.025 + 1.2)
-            + deploy_count * 5
-            + np.random.normal(0, noise * 16),
-            0, 100,
+            38 * bhf + 14 * np.sin(i * 0.025 + 1.2) + deploy_count * 5 + np.random.normal(0, noise * 16),
+            0,
+            100,
         )
 
         # Drift probability — higher when changes are frequent,
@@ -118,24 +115,27 @@ def generate_cluster(
             + (deploy_count / 6.0) * 0.28
             + (0.15 if mw else 0.0)
             + np.random.normal(0, 0.04),
-            0.0, 1.0,
+            0.0,
+            1.0,
         )
 
         drift_occurred = int(np.random.random() < drift_prob * (TARGET_DRIFT_RATE / 0.20))
 
-        records.append({
-            "time":                      ts.isoformat(),
-            "cluster_id":                cluster_id,
-            "cpu_utilization":           round(float(cpu), 2),
-            "memory_pressure":           round(float(mem), 2),
-            "deploy_count_last_hour":    round(float(deploy_count), 2),
-            "change_frequency_last_day": round(float(recent_chgs), 2),
-            "time_of_day_sin":           round(np.sin(2 * np.pi * ts.hour / 24), 4),
-            "time_of_day_cos":           round(np.cos(2 * np.pi * ts.hour / 24), 4),
-            "day_of_week":               ts.weekday(),
-            "drift_probability_label":   round(float(drift_prob), 4),
-            "drift_occurred":            drift_occurred,
-        })
+        records.append(
+            {
+                "time": ts.isoformat(),
+                "cluster_id": cluster_id,
+                "cpu_utilization": round(float(cpu), 2),
+                "memory_pressure": round(float(mem), 2),
+                "deploy_count_last_hour": round(float(deploy_count), 2),
+                "change_frequency_last_day": round(float(recent_chgs), 2),
+                "time_of_day_sin": round(np.sin(2 * np.pi * ts.hour / 24), 4),
+                "time_of_day_cos": round(np.cos(2 * np.pi * ts.hour / 24), 4),
+                "day_of_week": ts.weekday(),
+                "drift_probability_label": round(float(drift_prob), 4),
+                "drift_occurred": drift_occurred,
+            }
+        )
 
     return pd.DataFrame(records)
 
@@ -143,7 +143,8 @@ def generate_cluster(
 def load_to_timescaledb(df: pd.DataFrame, host: str = "localhost", port: int = 5433) -> None:
     """Loads generated telemetry into TimescaleDB."""
     conn = psycopg2.connect(
-        host=host, port=port,
+        host=host,
+        port=port,
         database="infraguard_ts",
         user="infraguard",
         password="infraguard_dev",
@@ -168,16 +169,15 @@ def load_to_timescaledb(df: pd.DataFrame, host: str = "localhost", port: int = 5
     """)
 
     try:
-        cur.execute(
-            "SELECT create_hypertable('telemetry', 'time', if_not_exists => TRUE);"
-        )
+        cur.execute("SELECT create_hypertable('telemetry', 'time', if_not_exists => TRUE);")
     except Exception:
-        pass   # Already a hypertable
+        pass  # Already a hypertable
 
     conn.commit()
 
     # Bulk insert via COPY
     from io import StringIO
+
     output = StringIO()
     df.to_csv(output, index=False, header=False)
     output.seek(0)
@@ -192,9 +192,9 @@ def main(timescaledb_host: str = "localhost") -> pd.DataFrame:
     start = datetime(2026, 1, 1, 0, 0, 0)
 
     clusters = [
-        ("cluster-prod-01",    0.08,  0.10),
-        ("cluster-staging-01", 0.14,  0.18),
-        ("cluster-dev-01",     0.20,  0.22),
+        ("cluster-prod-01", 0.08, 0.10),
+        ("cluster-staging-01", 0.14, 0.18),
+        ("cluster-dev-01", 0.20, 0.22),
     ]
 
     all_frames = []
@@ -204,7 +204,9 @@ def main(timescaledb_host: str = "localhost") -> pd.DataFrame:
         all_frames.append(df)
         log.info(
             "  %s: %d records, drift rate=%.2f%%",
-            cid, len(df), df["drift_occurred"].mean() * 100,
+            cid,
+            len(df),
+            df["drift_occurred"].mean() * 100,
         )
 
     combined = pd.concat(all_frames, ignore_index=True)
@@ -229,4 +231,3 @@ def main(timescaledb_host: str = "localhost") -> pd.DataFrame:
 if __name__ == "__main__":
     host = sys.argv[1] if len(sys.argv) > 1 else "localhost"
     main(timescaledb_host=host)
-

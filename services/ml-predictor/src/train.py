@@ -25,9 +25,9 @@ def flatten_sequences(X):
     N, seq_len, n_feat = X.shape
     X_flat = X.reshape(N, seq_len * n_feat)
     X_mean = X.mean(axis=1)
-    X_std  = X.std(axis=1)
-    X_max  = X.max(axis=1)
-    X_min  = X.min(axis=1)
+    X_std = X.std(axis=1)
+    X_max = X.max(axis=1)
+    X_min = X.min(axis=1)
     return np.hstack([X_flat, X_mean, X_std, X_max, X_min])
 
 
@@ -38,8 +38,8 @@ def train(
     experiment="infraguard-drift-prediction",
 ):
     X_raw = np.load(X_path)
-    y     = np.load(y_path)
-    log.info("Loaded X=%s y=%s positive_rate=%.2f%%", X_raw.shape, y.shape, y.mean()*100)
+    y = np.load(y_path)
+    log.info("Loaded X=%s y=%s positive_rate=%.2f%%", X_raw.shape, y.shape, y.mean() * 100)
 
     X = flatten_sequences(X_raw)
     log.info("Flattened X shape: %s", X.shape)
@@ -50,7 +50,11 @@ def train(
         log.info("Subsampled to %d rows for speed", len(X))
 
     X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=0.2, stratify=y, random_state=42,
+        X,
+        y,
+        test_size=0.2,
+        stratify=y,
+        random_state=42,
     )
 
     sample_weights = compute_sample_weight("balanced", y_train)
@@ -61,11 +65,11 @@ def train(
     mlflow.set_experiment(experiment)
 
     params = {
-        "model":            "GradientBoostingClassifier",
-        "n_estimators":     300,
-        "max_depth":        5,
-        "learning_rate":    0.05,
-        "subsample":        0.8,
+        "model": "GradientBoostingClassifier",
+        "n_estimators": 300,
+        "max_depth": 5,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
         "min_samples_leaf": 15,
     }
 
@@ -74,39 +78,40 @@ def train(
 
         log.info("Training GradientBoostingClassifier...")
         model = GradientBoostingClassifier(
-            n_estimators     = params["n_estimators"],
-            max_depth        = params["max_depth"],
-            learning_rate    = params["learning_rate"],
-            subsample        = params["subsample"],
-            min_samples_leaf = params["min_samples_leaf"],
-            random_state     = 42,
-            verbose          = 1,
+            n_estimators=params["n_estimators"],
+            max_depth=params["max_depth"],
+            learning_rate=params["learning_rate"],
+            subsample=params["subsample"],
+            min_samples_leaf=params["min_samples_leaf"],
+            random_state=42,
+            verbose=1,
         )
         model.fit(X_train, y_train, sample_weight=sample_weights)
 
         y_prob = model.predict_proba(X_val)[:, 1]
         y_pred = (y_prob >= 0.5).astype(int)
 
-        auc       = roc_auc_score(y_val, y_prob)
+        auc = roc_auc_score(y_val, y_prob)
         precision = precision_score(y_val, y_pred, zero_division=0)
-        recall    = recall_score(y_val, y_pred, zero_division=0)
-        f1        = f1_score(y_val, y_pred, zero_division=0)
+        recall = recall_score(y_val, y_pred, zero_division=0)
+        f1 = f1_score(y_val, y_pred, zero_division=0)
 
-        log.info("AUC=%.4f  Precision=%.4f  Recall=%.4f  F1=%.4f",
-                 auc, precision, recall, f1)
+        log.info("AUC=%.4f  Precision=%.4f  Recall=%.4f  F1=%.4f", auc, precision, recall, f1)
 
-        mlflow.log_metrics({
-            "val_auc":       auc,
-            "val_precision": precision,
-            "val_recall":    recall,
-            "val_f1":        f1,
-        })
+        mlflow.log_metrics(
+            {
+                "val_auc": auc,
+                "val_precision": precision,
+                "val_recall": recall,
+                "val_f1": f1,
+            }
+        )
 
         # Save model artifact locally
         model_artifacts = {
-            "model":   model,
+            "model": model,
             "seq_len": X_raw.shape[1],
-            "n_feat":  X_raw.shape[2],
+            "n_feat": X_raw.shape[2],
         }
         local_path = "/tmp/infraguard_model.pkl"
         with open(local_path, "wb") as f:

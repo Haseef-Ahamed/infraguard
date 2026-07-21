@@ -64,19 +64,20 @@ async def load_model() -> None:
 
 # ── Request / Response schemas ───────────────────────────────────────────────
 class TelemetryPoint(BaseModel):
-    cpu_utilization:           float = Field(..., ge=0, le=100)
-    memory_pressure:           float = Field(..., ge=0, le=100)
-    deploy_count_last_hour:    float = Field(..., ge=0)
+    cpu_utilization: float = Field(..., ge=0, le=100)
+    memory_pressure: float = Field(..., ge=0, le=100)
+    deploy_count_last_hour: float = Field(..., ge=0)
     change_frequency_last_day: float = Field(..., ge=0)
-    time_of_day_sin:           float = Field(..., ge=-1, le=1)
-    time_of_day_cos:           float = Field(..., ge=-1, le=1)
-    day_of_week:               int   = Field(..., ge=0, le=6)
+    time_of_day_sin: float = Field(..., ge=-1, le=1)
+    time_of_day_cos: float = Field(..., ge=-1, le=1)
+    day_of_week: int = Field(..., ge=0, le=6)
 
 
 class PredictRequest(BaseModel):
-    cluster_id:       str
+    cluster_id: str
     telemetry_window: List[TelemetryPoint] = Field(
-        ..., min_length=SEQ_LEN,
+        ...,
+        min_length=SEQ_LEN,
         description=f"Must contain at least {SEQ_LEN} data points (5-minute intervals)",
     )
 
@@ -88,12 +89,12 @@ class ForecastWindows(BaseModel):
 
 
 class PredictResponse(BaseModel):
-    cluster_id:        str
+    cluster_id: str
     drift_probability: float
-    anomaly:           bool
+    anomaly: bool
     anomaly_threshold: float
-    forecast_windows:  ForecastWindows
-    model_type:        str = "GradientBoostingClassifier"
+    forecast_windows: ForecastWindows
+    model_type: str = "GradientBoostingClassifier"
 
 
 # ── Helper — flatten one window ──────────────────────────────────────────────
@@ -102,22 +103,22 @@ def flatten_window(window: List[TelemetryPoint]) -> np.ndarray:
     Converts a list of TelemetryPoint into the same flattened feature
     vector that was used during training.
     """
-    seq_len  = MODEL_ARTIFACTS.get("seq_len", SEQ_LEN)
-    n_feat   = MODEL_ARTIFACTS.get("n_feat", len(FEATURES))
+    seq_len = MODEL_ARTIFACTS.get("seq_len", SEQ_LEN)
+    n_feat = MODEL_ARTIFACTS.get("n_feat", len(FEATURES))
 
     # Take the last seq_len points
     points = window[-seq_len:]
-    X_raw  = np.array(
+    X_raw = np.array(
         [[getattr(p, f) for f in FEATURES] for p in points],
         dtype=np.float32,
     )  # (seq_len, n_feat)
 
     # Replicate training flatten logic
-    X_flat = X_raw.reshape(1, seq_len * n_feat)         # (1, seq_len*n_feat)
-    X_mean = X_raw.mean(axis=0, keepdims=True)           # (1, n_feat)
-    X_std  = X_raw.std(axis=0, keepdims=True)
-    X_max  = X_raw.max(axis=0, keepdims=True)
-    X_min  = X_raw.min(axis=0, keepdims=True)
+    X_flat = X_raw.reshape(1, seq_len * n_feat)  # (1, seq_len*n_feat)
+    X_mean = X_raw.mean(axis=0, keepdims=True)  # (1, n_feat)
+    X_std = X_raw.std(axis=0, keepdims=True)
+    X_max = X_raw.max(axis=0, keepdims=True)
+    X_min = X_raw.min(axis=0, keepdims=True)
 
     return np.hstack([X_flat, X_mean, X_std, X_max, X_min])  # (1, features)
 
@@ -141,9 +142,9 @@ async def model_info() -> Dict[str, Any]:
         raise HTTPException(status_code=503, detail="Model not loaded")
     return {
         "model_type": "GradientBoostingClassifier",
-        "seq_len":    MODEL_ARTIFACTS.get("seq_len", SEQ_LEN),
+        "seq_len": MODEL_ARTIFACTS.get("seq_len", SEQ_LEN),
         "n_features": MODEL_ARTIFACTS.get("n_feat", len(FEATURES)),
-        "features":   FEATURES,
+        "features": FEATURES,
         "anomaly_threshold": 0.60,
     }
 
@@ -170,14 +171,14 @@ async def predict(req: PredictRequest) -> PredictResponse:
     threshold = 0.60
 
     return PredictResponse(
-        cluster_id        = req.cluster_id,
-        drift_probability = round(prob, 4),
-        anomaly           = prob >= threshold,
-        anomaly_threshold = threshold,
-        forecast_windows  = ForecastWindows(
-            minutes_15 = prob_15m,
-            minutes_30 = prob_30m,
-            minutes_60 = prob_60m,
+        cluster_id=req.cluster_id,
+        drift_probability=round(prob, 4),
+        anomaly=prob >= threshold,
+        anomaly_threshold=threshold,
+        forecast_windows=ForecastWindows(
+            minutes_15=prob_15m,
+            minutes_30=prob_30m,
+            minutes_60=prob_60m,
         ),
     )
 
