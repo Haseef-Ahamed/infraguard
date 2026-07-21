@@ -1,8 +1,8 @@
 aliases: []
 creation_timestamp: 1783493964922
-current_stage: Production
+current_stage: Archived
 description: null
-last_updated_timestamp: 1783494005807
+last_updated_timestamp: 1783586511980
 name: infraguard-drift-predictor
 run_id: fb65bd3dad2c45b6986cf25d266b58fa
 run_link: null
