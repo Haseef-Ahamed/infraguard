@@ -41,3 +41,4 @@ dashboard/build/
 .idea/
 *.swp
 .DS_Store
+.github-token

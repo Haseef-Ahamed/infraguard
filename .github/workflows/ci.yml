@@ -103,3 +103,24 @@ jobs:
           fetch-depth: 0
       - name: gitleaks
         run: gitleaks detect --source . --log-opts HEAD~1..HEAD --verbose
+
+  conftest-gate:
+    name: OPA Compliance Gate
+    runs-on: self-hosted
+    needs: validate-iac
+    steps:
+      - uses: actions/checkout@v4
+      - name: OPA unit tests
+        run: opa test policies/rego/ -v
+      - name: Generate Terraform plan
+        working-directory: infra
+        run: |
+          tofu init -backend=false -input=false
+          TF_VAR_db_password=test tofu plan -out=tfplan.binary
+          tofu show -json tfplan.binary > tfplan.json
+      - name: Conftest policy gate
+        run: |
+          conftest test infra/tfplan.json \
+            --policy policies/rego/ \
+            --namespace infraguard.cis \
+            --output table

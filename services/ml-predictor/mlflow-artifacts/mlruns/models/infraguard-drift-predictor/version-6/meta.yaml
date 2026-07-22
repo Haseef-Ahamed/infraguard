@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1784702339637
+current_stage: Production
+description: null
+last_updated_timestamp: 1784702341872
+name: infraguard-drift-predictor
+run_id: 88a0338615144418ad290fa94186272e
+run_link: null
+source: file:///home/hsf/infraguard/services/ml-predictor/mlflow-artifacts/mlruns/652447951894059450/88a0338615144418ad290fa94186272e/artifacts/gbm-drift-model
+status: READY
+status_message: null
+storage_location: file:///home/hsf/infraguard/services/ml-predictor/mlflow-artifacts/mlruns/652447951894059450/88a0338615144418ad290fa94186272e/artifacts/gbm-drift-model
+user_id: null
+version: 6
