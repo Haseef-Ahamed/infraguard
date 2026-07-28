@@ -14,6 +14,7 @@ import (
 
 	"github.com/infraguard/remediation/pkg/github"
 	"github.com/infraguard/remediation/pkg/remediate"
+	"github.com/infraguard/remediation/pkg/ws"
 )
 
 const subjectDetected = "infraguard.drift.detected"
@@ -48,6 +49,8 @@ func main() {
 		ghClient = github.NewClient(ghToken, ghOwner, ghRepo)
 	}
 
+	hub := ws.NewHub(log)
+
 	nc, err := nats.Connect(natsURL, nats.RetryOnFailedConnect(true))
 	if err != nil {
 		log.Fatal("nats connect", zap.Error(err))
@@ -72,6 +75,7 @@ func main() {
 			zap.String("severity", severity),
 			zap.String("change_type", event.ChangeType),
 		)
+		hub.Broadcast(event)
 
 		switch severity {
 		case "CRITICAL", "HIGH":
@@ -108,6 +112,7 @@ func main() {
 				w.WriteHeader(503)
 			}
 		})
+		mux.HandleFunc("/ws", hub.HandleWS)
 		http.ListenAndServe(getEnv("METRICS_ADDR", ":8082"), mux)
 	}()
 

@@ -1,0 +1,20 @@
+artifact_path: gbm-drift-model
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.12.3
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.5.0
+mlflow_version: 2.13.0
+model_size_bytes: 1050768
+model_uuid: 47a7c3f3d73c4ad1a89aed432865be6e
+run_id: b492ff0280e742f5a46659ada7d30d80
+utc_time_created: '2026-07-27 05:04:06.526680'
