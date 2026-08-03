@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"os/signal"
 	"syscall"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/infraguard/remediation/pkg/github"
+	"github.com/infraguard/remediation/pkg/metrics"
 	"github.com/infraguard/remediation/pkg/pagerduty"
 	"github.com/infraguard/remediation/pkg/remediate"
 	"github.com/infraguard/remediation/pkg/sla"
@@ -71,6 +73,7 @@ func main() {
 
 	// SLA tracker — fires escalation when CRITICAL drift isn't resolved in time
 	tracker := sla.NewTracker(slaMinutes, func(resourceID string, minutesElapsed int) {
+		metrics.SLABreachesTotal.Inc()
 		log.Warn("SLA BREACH", zap.String("resource_id", resourceID), zap.Int("minutes_elapsed", minutesElapsed))
 		if slackClient != nil {
 			_ = slackClient.PostEscalation(resourceID, minutesElapsed)
@@ -83,6 +86,16 @@ func main() {
 	})
 	tracker.Run(1 * time.Minute) // check every minute
 	defer tracker.Stop()
+
+	// Periodically update gauges for Prometheus
+	go func() {
+		gTicker := time.NewTicker(15 * time.Second)
+		defer gTicker.Stop()
+		for range gTicker.C {
+			metrics.TrackedEventsGauge.Set(float64(tracker.TrackedCount()))
+			metrics.DashboardClientsGauge.Set(float64(hub.ClientCount()))
+		}
+	}()
 
 	nc, err := nats.Connect(natsURL, nats.RetryOnFailedConnect(true))
 	if err != nil {
@@ -119,6 +132,7 @@ func main() {
 				if err == nil {
 					prURL = url
 					prsOpened++
+					metrics.PRsOpenedTotal.WithLabelValues(severity).Inc()
 					log.Info("remediation PR opened", zap.String("url", url), zap.Int("pr_number", num))
 				}
 			} else {
@@ -129,6 +143,7 @@ func main() {
 		}
 
 		if slackClient != nil {
+			metrics.SlackAlertsTotal.WithLabelValues(severity).Inc()
 			_ = slackClient.PostDriftAlert(slack.DriftAlert{
 				ResourceID: event.ResourceID, ChangeType: event.ChangeType,
 				Severity: severity, Actor: event.Actor, PRUrl: prURL,
@@ -151,6 +166,7 @@ func main() {
 			}
 		})
 		mux.HandleFunc("/ws", hub.HandleWS)
+		mux.Handle("/metrics", promhttp.Handler())
 		mux.HandleFunc("/sla-status", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, `{"tracked_events": %d}`, tracker.TrackedCount())
 		})

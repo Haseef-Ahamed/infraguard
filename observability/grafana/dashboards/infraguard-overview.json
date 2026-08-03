@@ -1,0 +1,86 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "title": "InfraGuard — Platform Overview",
+  "uid": "infraguard-overview",
+  "version": 1,
+  "schemaVersion": 39,
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Drift Events (Total)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum(infraguard_drift_events_total)", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"green","value":null}] } } }
+    },
+    {
+      "id": 2,
+      "title": "Remediation PRs Opened",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "targets": [{ "expr": "sum(infraguard_remediation_prs_opened_total)", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"blue","value":null}] } } }
+    },
+    {
+      "id": 3,
+      "title": "SLA Breaches",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "targets": [{ "expr": "sum(infraguard_sla_breaches_total)", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"green","value":null},{"color":"red","value":1}] } } }
+    },
+    {
+      "id": 4,
+      "title": "Resources Monitored",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "targets": [{ "expr": "sum(infraguard_resources_monitored_total)", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"purple","value":null}] } } }
+    },
+    {
+      "id": 5,
+      "title": "Drift Events Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "targets": [{ "expr": "rate(infraguard_drift_events_total[5m])", "legendFormat": "{{change_type}}", "refId": "A" }]
+    },
+    {
+      "id": 6,
+      "title": "Scan Duration (p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "targets": [{ "expr": "histogram_quantile(0.99, rate(infraguard_scan_duration_seconds_bucket[5m]))", "legendFormat": "p99 scan duration", "refId": "A" }]
+    },
+    {
+      "id": 7,
+      "title": "Tracked SLA Events (Live)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "targets": [{ "expr": "infraguard_sla_tracked_events", "legendFormat": "Open CRITICAL/HIGH events", "refId": "A" }]
+    },
+    {
+      "id": 8,
+      "title": "Dashboard WebSocket Clients Connected",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "targets": [{ "expr": "infraguard_dashboard_clients_connected", "legendFormat": "Connected clients", "refId": "A" }]
+    },
+    {
+      "id": 9,
+      "title": "Slack Alerts Sent (by Severity)",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "targets": [{ "expr": "sum by (severity) (infraguard_slack_alerts_total)", "legendFormat": "{{severity}}", "refId": "A" }]
+    },
+    {
+      "id": 10,
+      "title": "NATS Publish Errors",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "targets": [{ "expr": "rate(infraguard_nats_publish_errors_total[5m])", "legendFormat": "Publish errors/sec", "refId": "A" }]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+groups:
+  - name: infraguard
+    rules:
+      - alert: HighSLABreachRate
+        expr: increase(infraguard_sla_breaches_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "InfraGuard SLA breach detected"
+          description: "One or more CRITICAL drift events were not remediated within the SLA window."
+
+      - alert: DriftDetectionStalled
+        expr: absent(infraguard_scan_duration_seconds_count)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Drift detection appears stalled"
+          description: "No scan completions recorded in the last 10 minutes."
