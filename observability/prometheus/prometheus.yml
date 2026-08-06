@@ -6,6 +6,6 @@ scrape_configs:
   - job_name: prometheus
     static_configs: [{targets: ['localhost:9090']}]
   - job_name: infraguard-drift-engine
-    static_configs: [{targets: ['host.docker.internal:8080']}]
+    static_configs: [{targets: ['172.19.0.1:8080']}]
   - job_name: infraguard-remediation
-    static_configs: [{targets: ['host.docker.internal:8082']}]
+    static_configs: [{targets: ['172.19.0.1:8082']}]

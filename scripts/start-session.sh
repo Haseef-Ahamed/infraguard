@@ -68,6 +68,16 @@ if ! argocd app get infraguard-platform &>/dev/null; then
     --self-heal 2>&1 || echo "  (app creation skipped — may already exist or repo unreachable)"
 fi
 
+echo "[5.5/10] Starting standalone drift-engine on host (for Prometheus scraping)..."
+fuser -k 8080/tcp 2>/dev/null || true
+sleep 1
+cd services/drift-engine
+go build -o /tmp/drift-engine-test ./cmd/agent/
+nohup /tmp/drift-engine-test > /tmp/drift-engine-host.log 2>&1 &
+cd ~/infraguard
+sleep 3
+curl -s http://localhost:8080/healthz && echo " Drift engine (host) OK"
+
 echo "[6/10] Redeploying drift-engine DaemonSet..."
 HOST_IP=$(docker inspect infraguard-worker --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' | head -1)
 kubectl apply -f charts/infraguard/templates/drift-engine-rbac.yaml
@@ -142,6 +152,7 @@ cd ~/infraguard
 
 # Open firewall for browser access from Windows host (idempotent)
 sudo ufw allow 3000/tcp 2>/dev/null || true
+sudo ufw allow 8080/tcp 2>/dev/null || true
 sudo ufw allow 8081/tcp 2>/dev/null || true
 sudo ufw allow 8082/tcp 2>/dev/null || true
 
