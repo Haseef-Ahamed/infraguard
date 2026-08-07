@@ -56,25 +56,18 @@ cd ~/infraguard/services/drift-engine
 GO_BUILD=$(go build ./... 2>&1 && echo true || echo false)
 check "Go build succeeds" "$GO_BUILD"
 cd ~/infraguard
+DE_HEALTH=$(curl -s http://localhost:8080/healthz 2>/dev/null | grep -q "ok" && echo true || echo false)
+check "Drift engine (host) /healthz" "$DE_HEALTH"
 
 echo ""; echo "── Go Remediation Engine ──"
 cd ~/infraguard/services/remediation
 REM_BUILD=$(go build ./... 2>&1 && echo true || echo false)
 check "Remediation engine build succeeds" "$REM_BUILD"
 cd ~/infraguard
-
-fuser -k 8082/tcp 2>/dev/null || true
-sleep 1
-nohup /tmp/remediation-test > /tmp/remediation-test.log 2>&1 &
-RPID=$!
-disown
-REM_HEALTH=false
-for i in $(seq 1 10); do
-  curl -s http://localhost:8082/healthz 2>/dev/null | grep -q "ok" && REM_HEALTH=true && break
-  sleep 1
-done
+REM_HEALTH=$(curl -s http://localhost:8082/healthz 2>/dev/null | grep -q "ok" && echo true || echo false)
 check "Remediation engine /healthz" "$REM_HEALTH"
-kill $RPID 2>/dev/null
+REM_METRICS=$(curl -s http://localhost:8082/metrics 2>/dev/null | grep -c "infraguard_remediation_prs_opened_total\|infraguard_slack_alerts_total\|infraguard_sla_breaches_total")
+check "Remediation metrics exposed" "$([ "$REM_METRICS" -ge 1 ] && echo true || echo false)"
 
 echo ""; echo "── MLflow ──"
 MLFLOW_OK=$(curl -s http://localhost:5000/health 2>/dev/null | grep -q "OK" && echo true || echo false)
@@ -83,27 +76,28 @@ MODEL_FILE=$([ -f /tmp/infraguard_model.pkl ] && echo true || echo false)
 check "ML model file exists" "$MODEL_FILE"
 
 echo ""; echo "── ML Predictor API ──"
-fuser -k 8001/tcp 2>/dev/null || true
-sleep 2
-cd ~/infraguard/services/ml-predictor
-source venv/bin/activate
-nohup python3 -m uvicorn main:app --app-dir src --host 0.0.0.0 --port 8001 > /tmp/ml-test.log 2>&1 &
-MLPID=$!
-disown
-ML_HEALTH=false
-for i in $(seq 1 15); do
-  curl -s http://localhost:8001/healthz 2>/dev/null | grep -q "ok" && ML_HEALTH=true && break
-  sleep 1
-done
+ML_HEALTH=$(curl -s http://localhost:8001/healthz 2>/dev/null | grep -q "ok" && echo true || echo false)
 check "ML predictor /healthz" "$ML_HEALTH"
 ML_READY=$(curl -s http://localhost:8001/readyz 2>/dev/null | grep -q "ready" && echo true || echo false)
 check "ML predictor /readyz (model loaded)" "$ML_READY"
-kill $MLPID 2>/dev/null
-cd ~/infraguard
 
 echo ""; echo "── React Dashboard ──"
 DASH_OK=$(curl -s http://localhost:3000 2>/dev/null | grep -qi "<title>" && echo true || echo false)
 check "Dashboard responding" "$DASH_OK"
+
+echo ""; echo "── Observability (Prometheus + Grafana) ──"
+PROM_TARGETS_UP=$(curl -s http://localhost:9090/api/v1/targets 2>/dev/null | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin)
+    print(sum(1 for t in d['data']['activeTargets'] if t['health']=='up'))
+except: print(0)
+" 2>/dev/null)
+check "All Prometheus targets up (3)" "$([ "$PROM_TARGETS_UP" = "3" ] && echo true || echo false)"
+GRAFANA_DASH=$(curl -s -u admin:admin http://localhost:3001/api/search?query=InfraGuard 2>/dev/null | grep -c "InfraGuard")
+check "Grafana dashboard provisioned" "$([ "$GRAFANA_DASH" -ge 1 ] && echo true || echo false)"
+PROM_RULES=$(curl -s http://localhost:9090/api/v1/rules 2>/dev/null | grep -c "HighSLABreachRate\|DriftDetectionStalled")
+check "Prometheus alert rules loaded" "$([ "$PROM_RULES" -ge 1 ] && echo true || echo false)"
 
 echo ""
 echo "════════════════════════════════════════════"
