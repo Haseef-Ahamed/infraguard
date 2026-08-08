@@ -42,3 +42,4 @@ dashboard/build/
 *.swp
 .DS_Store
 .github-token
+.cosign/cosign.key
