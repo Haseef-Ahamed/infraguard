@@ -128,7 +128,6 @@ jobs:
   supply-chain-security:
     name: Supply Chain Security (Cosign + Syft)
     runs-on: self-hosted
-    needs: [docker-build]
     steps:
       - uses: actions/checkout@v4
       - name: Build image
