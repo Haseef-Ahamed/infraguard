@@ -124,3 +124,22 @@ jobs:
             --policy policies/rego/ \
             --namespace infraguard.cis \
             --output table
+
+  supply-chain-security:
+    name: Supply Chain Security (Cosign + Syft)
+    runs-on: self-hosted
+    needs: [docker-build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t infraguard/drift-engine:${{ github.sha }} services/drift-engine/
+      - name: Generate SBOM
+        run: |
+          syft infraguard/drift-engine:${{ github.sha }} -o spdx-json > sbom-${{ github.sha }}.json
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-drift-engine
+          path: sbom-${{ github.sha }}.json
+      - name: Gitleaks full scan
+        run: gitleaks detect --source . --verbose

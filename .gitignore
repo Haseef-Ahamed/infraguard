@@ -43,3 +43,4 @@ dashboard/build/
 .DS_Store
 .github-token
 .cosign/cosign.key
+services/ml-predictor/mlflow-artifacts/
