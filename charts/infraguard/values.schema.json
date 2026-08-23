@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "driftEngine": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "scanIntervalSeconds": { "type": "integer", "minimum": 30 }
+      }
+    },
+    "remediation": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "slaMinutes": { "type": "integer", "minimum": 5 }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: infraguard
+description: Autonomous Multi-Cloud Infrastructure Drift Detection & Self-Healing Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - devops
+  - devsecops
+  - drift-detection
+  - compliance
+  - kubernetes
+maintainers:
+  - name: Haseef Ahamed

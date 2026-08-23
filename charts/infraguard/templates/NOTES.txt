@@ -1,0 +1,22 @@
+InfraGuard has been deployed! 🎉
+
+Components enabled:
+{{- if .Values.driftEngine.enabled }}
+  ✓ Drift Detection Engine  (namespace: {{ .Values.driftEngine.namespace }})
+{{- end }}
+{{- if .Values.remediation.enabled }}
+  ✓ Remediation Engine      (namespace: {{ .Values.remediation.namespace }})
+{{- end }}
+{{- if .Values.dashboard.enabled }}
+  ✓ React Dashboard         (namespace: {{ .Values.dashboard.namespace }})
+{{- end }}
+
+Check status:
+  kubectl get pods -n {{ .Values.driftEngine.namespace }}
+  kubectl get pods -n {{ .Values.remediation.namespace }}
+
+View drift-engine logs:
+  kubectl logs -n {{ .Values.driftEngine.namespace }} -l app=drift-engine -f
+
+Uninstall:
+  helm uninstall {{ .Release.Name }}

@@ -1,0 +1,64 @@
+{{- if .Values.remediation.enabled }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.remediation.namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: remediation-config
+  namespace: {{ .Values.remediation.namespace }}
+data:
+  NATS_URL: "nats://{{ .Values.global.vaultAddr | trimPrefix "http://" | splitList ":" | first }}:4222"
+  METRICS_ADDR: ":{{ .Values.remediation.port }}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: remediation-engine
+  namespace: {{ .Values.remediation.namespace }}
+  labels:
+    app: remediation-engine
+spec:
+  replicas: {{ .Values.remediation.replicas }}
+  selector:
+    matchLabels:
+      app: remediation-engine
+  template:
+    metadata:
+      labels:
+        app: remediation-engine
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.remediation.port }}"
+    spec:
+      containers:
+        - name: remediation-engine
+          image: "{{ .Values.remediation.image.repository }}:{{ .Values.remediation.image.tag }}"
+          imagePullPolicy: {{ .Values.remediation.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.remediation.port }}
+          envFrom:
+            - configMapRef:
+                name: remediation-config
+          resources:
+            {{- toYaml .Values.remediation.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.remediation.port }}
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: remediation-engine
+  namespace: {{ .Values.remediation.namespace }}
+spec:
+  selector:
+    app: remediation-engine
+  ports:
+    - port: {{ .Values.remediation.port }}
+      targetPort: {{ .Values.remediation.port }}
+{{- end }}

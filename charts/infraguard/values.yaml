@@ -1,0 +1,68 @@
+# ── Global settings ──────────────────────────────────────────────────────
+global:
+  environment: dev
+  vaultAddr: "http://172.19.0.1:8200"
+  vaultToken: "root"
+
+# ── Drift Detection Engine ───────────────────────────────────────────────
+driftEngine:
+  enabled: true
+  namespace: drift-engine
+  image:
+    repository: infraguard/drift-engine
+    tag: latest
+    pullPolicy: Never
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  scanIntervalSeconds: 300
+  metricsPort: 8080
+
+# ── Remediation Engine ────────────────────────────────────────────────────
+remediation:
+  enabled: true
+  namespace: remediation
+  image:
+    repository: infraguard/remediation
+    tag: latest
+    pullPolicy: Never
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  port: 8082
+  slaMinutes: 30
+
+# ── React Dashboard ───────────────────────────────────────────────────────
+dashboard:
+  enabled: true
+  namespace: dashboard
+  replicas: 1
+  port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+# ── Ingress (optional, disabled by default for local dev) ────────────────
+ingress:
+  enabled: false
+  host: infraguard.local
+
+# ── Feature flags ──────────────────────────────────────────────────────────
+features:
+  mlPredictionEnabled: true
+  autoApplyLowSeverity: false
+  slackAlertsEnabled: true
+  pagerDutyEnabled: false

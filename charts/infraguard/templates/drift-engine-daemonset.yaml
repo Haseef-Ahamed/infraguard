@@ -1,62 +1,44 @@
+{{- if .Values.driftEngine.enabled }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: drift-engine
-  namespace: drift-engine
+  namespace: {{ .Values.driftEngine.namespace }}
   labels:
     app: drift-engine
-    component: detection
-    version: v1
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 spec:
   selector:
     matchLabels:
       app: drift-engine
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
   template:
     metadata:
       labels:
         app: drift-engine
-        component: detection
-        version: v1
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port:   "8080"
-        prometheus.io/path:   "/metrics"
+        prometheus.io/port: "{{ .Values.driftEngine.metricsPort }}"
     spec:
       serviceAccountName: infraguard-sa
-      terminationGracePeriodSeconds: 30
       containers:
         - name: drift-engine
-          image: infraguard/drift-engine:latest
-          imagePullPolicy: Never
+          image: "{{ .Values.driftEngine.image.repository }}:{{ .Values.driftEngine.image.tag }}"
+          imagePullPolicy: {{ .Values.driftEngine.image.pullPolicy }}
           ports:
-            - name: metrics
-              containerPort: 8080
-              protocol: TCP
+            - containerPort: {{ .Values.driftEngine.metricsPort }}
           envFrom:
             - configMapRef:
                 name: drift-engine-config
           resources:
-            requests:
-              cpu:    "50m"
-              memory: "64Mi"
-            limits:
-              cpu:    "200m"
-              memory: "256Mi"
+            {{- toYaml .Values.driftEngine.resources | nindent 12 }}
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 8080
+              port: {{ .Values.driftEngine.metricsPort }}
             initialDelaySeconds: 15
-            periodSeconds: 30
-            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /readyz
-              port: 8080
+              port: {{ .Values.driftEngine.metricsPort }}
             initialDelaySeconds: 10
-            periodSeconds: 15
-            failureThreshold: 3
+{{- end }}
