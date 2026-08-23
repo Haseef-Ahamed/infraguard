@@ -142,3 +142,44 @@ jobs:
           path: sbom-${{ github.sha }}.json
       - name: Gitleaks full scan
         run: gitleaks detect --source . --verbose
+
+  sonarqube-scan:
+    name: SonarQube Quality Gate
+    runs-on: self-hosted
+    needs: [test-go, test-python]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Go coverage
+        working-directory: services/drift-engine
+        run: go test ./... -coverprofile=coverage.out
+      - name: Python coverage
+        working-directory: services/ml-predictor
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt pytest-cov --quiet
+          python3 -m pytest tests/ --cov=src --cov-report=xml
+      - name: SonarQube scan (drift-engine)
+        working-directory: services/drift-engine
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: sonar-scanner -Dsonar.host.url=http://localhost:9000
+      - name: SonarQube scan (ml-predictor)
+        working-directory: services/ml-predictor
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: sonar-scanner -Dsonar.host.url=http://localhost:9000
+      - name: Quality Gate check
+        run: |
+          for project in infraguard-drift-engine infraguard-ml-predictor; do
+            STATUS=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
+              "http://localhost:9000/api/qualitygates/project_status?projectKey=$project" \
+              | python3 -c "import json,sys; print(json.load(sys.stdin)['projectStatus']['status'])")
+            echo "$project: $STATUS"
+            if [ "$STATUS" != "OK" ]; then
+              echo "Quality gate FAILED for $project"
+              exit 1
+            fi
+          done

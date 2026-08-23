@@ -5,7 +5,7 @@ services:
     image: localstack/localstack:3.4
     container_name: localstack
     ports:
-      - "4566:4566"
+      - "127.0.0.1:4566:4566"
     environment:
       SERVICES: ec2,s3,iam,rds,cloudtrail,events,sqs,sns,secretsmanager
       DEBUG: 0
@@ -23,7 +23,7 @@ services:
     image: postgres:16-alpine
     container_name: infraguard-postgres
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: infraguard
       POSTGRES_USER: infraguard
@@ -40,7 +40,7 @@ services:
     image: timescale/timescaledb:latest-pg16
     container_name: infraguard-timescaledb
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     environment:
       POSTGRES_DB: infraguard_ts
       POSTGRES_USER: infraguard
@@ -57,15 +57,15 @@ services:
     image: nats:2.10-alpine
     container_name: infraguard-nats
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
     command: ["-js", "-m", "8222"]
 
   vault:
     image: hashicorp/vault:1.16
     container_name: infraguard-vault
     ports:
-      - "8200:8200"
+      - "127.0.0.1:8200:8200"
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: root
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
@@ -78,7 +78,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./observability/prometheus:/etc/prometheus
       - prometheus_data:/prometheus
@@ -91,7 +91,7 @@ services:
     image: grafana/grafana:10.4.2
     container_name: infraguard-grafana
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
@@ -106,7 +106,7 @@ services:
     image: ghcr.io/mlflow/mlflow:v2.13.0
     container_name: infraguard-mlflow
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     volumes:
       - mlflow_data:/mlflow/artifacts
     command: >
@@ -117,7 +117,26 @@ services:
       --default-artifact-root /mlflow/artifacts
       --gunicorn-opts "--timeout 120 --keep-alive 5 --worker-class gthread --threads 4"
 
+  sonarqube:
+    image: sonarqube:10.5-community
+    container_name: infraguard-sonarqube
+    ports:
+      - "127.0.0.1:9000:9000"
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
 volumes:
+  sonarqube_data: {}
+  sonarqube_logs: {}
+  sonarqube_extensions: {}
   localstack_data: {}
   postgres_data: {}
   timescale_data: {}
