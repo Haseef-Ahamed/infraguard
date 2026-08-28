@@ -183,3 +183,15 @@ jobs:
               exit 1
             fi
           done
+
+  e2e-tests:
+    name: End-to-End Test Suite
+    runs-on: self-hosted
+    needs: [supply-chain-security, sonarqube-scan]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run infra + compliance tests
+        working-directory: test/e2e
+        run: |
+          go mod tidy
+          go test -v -run "TestInfraBaseline|TestCompliance" -timeout 60s ./...
