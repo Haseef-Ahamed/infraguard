@@ -3,7 +3,7 @@ set -e
 echo "=== InfraGuard Session Startup ==="
 cd ~/infraguard
 
-echo "[1/11] Starting Docker services..."
+echo "[1/13] Starting Docker services..."
 docker compose up -d
 for i in $(seq 1 20); do
   curl -s http://localhost:4566/_localstack/health 2>/dev/null | grep -q '"ec2"' && break
@@ -11,17 +11,26 @@ for i in $(seq 1 20); do
 done
 sleep 5
 
-echo "[2/11] Restoring Vault secrets..."
+echo "[2/13] Starting local Docker registry (for Cosign signing)..."
+if ! docker ps --format '{{.Names}}' | grep -q '^local-registry$'; then
+  docker run -d -p 5001:5000 --restart=always --name local-registry registry:2 2>/dev/null || \
+    docker start local-registry 2>/dev/null || true
+fi
+
+echo "[3/13] Starting SonarQube (may take 1-2 min to become ready)..."
+docker compose up -d sonarqube
+
+echo "[4/13] Restoring Vault secrets..."
 export VAULT_ADDR=http://localhost:8200
 export VAULT_TOKEN=root
 bash scripts/vault-init.sh
 
-echo "[3/11] Restoring IaC baseline..."
+echo "[5/13] Restoring IaC baseline..."
 cd infra
 TF_VAR_db_password=infraguard_dev tofu apply -auto-approve
 cd ~/infraguard
 
-echo "[4/11] Rebuilding K8s namespaces/RBAC if needed..."
+echo "[6/13] Rebuilding K8s namespaces/RBAC if needed..."
 if ! kubectl get namespace drift-engine &>/dev/null; then
   kubectl create namespace drift-engine
   kubectl create namespace compliance
@@ -36,7 +45,7 @@ if ! kubectl get namespace drift-engine &>/dev/null; then
   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 fi
 
-echo "[5/11] Rebuilding ArgoCD if needed, then logging in..."
+echo "[7/13] Rebuilding ArgoCD if needed, then logging in..."
 if ! kubectl get namespace argocd &>/dev/null; then
   kubectl create namespace argocd
   kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --server-side --force-conflicts
@@ -62,7 +71,7 @@ if ! argocd app get infraguard-platform &>/dev/null; then
     --self-heal 2>&1 || true
 fi
 
-echo "[6/11] Starting standalone drift-engine on host (for Prometheus scraping)..."
+echo "[8/13] Starting standalone drift-engine on host (for Prometheus scraping)..."
 fuser -k 8080/tcp 2>/dev/null || true
 pkill -f drift-engine-test 2>/dev/null || true
 sleep 2
@@ -74,15 +83,28 @@ cd ~/infraguard
 sleep 5
 curl -s http://localhost:8080/healthz && echo " Drift engine (host) OK"
 
-echo "[7/11] Redeploying drift-engine DaemonSet in kind..."
+echo "[9/13] Deploying drift-engine + remediation via Helm..."
 HOST_IP=$(docker inspect infraguard-worker --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' | head -1)
-kubectl apply -f charts/infraguard/templates/drift-engine-rbac.yaml
-kubectl apply -f charts/infraguard/templates/drift-engine-config.yaml
 kind load docker-image infraguard/drift-engine:latest --name infraguard 2>/dev/null || true
-kubectl apply -f charts/infraguard/templates/drift-engine-daemonset.yaml
-kubectl rollout status daemonset/drift-engine -n drift-engine --timeout=60s || true
+kind load docker-image infraguard/remediation:latest --name infraguard 2>/dev/null || true
 
-echo "[8/11] Regenerating ML pipeline..."
+cd charts
+if helm list | grep -q '^infraguard\s'; then
+  echo "  Existing release found — upgrading..."
+  helm upgrade infraguard ./infraguard \
+    --set global.vaultAddr="http://${HOST_IP}:8200" \
+    --set remediation.natsUrl="nats://${HOST_IP}:4222"
+else
+  echo "  No existing release — installing..."
+  helm install infraguard ./infraguard \
+    --set global.vaultAddr="http://${HOST_IP}:8200" \
+    --set remediation.natsUrl="nats://${HOST_IP}:4222"
+fi
+cd ~/infraguard
+kubectl rollout status daemonset/drift-engine -n drift-engine --timeout=60s || true
+kubectl rollout status deployment/remediation-engine -n remediation --timeout=60s || true
+
+echo "[10/13] Regenerating ML pipeline..."
 cd services/ml-predictor
 source venv/bin/activate
 python3 src/generate_data.py
@@ -92,7 +114,7 @@ python3 src/promote_model.py
 deactivate
 cd ~/infraguard
 
-echo "[9/11] Starting ML inference server..."
+echo "[11/13] Starting ML inference server..."
 fuser -k 8001/tcp 2>/dev/null || true
 sleep 1
 cd services/ml-predictor
@@ -103,7 +125,7 @@ cd ~/infraguard
 sleep 5
 curl -s http://localhost:8001/healthz && echo " ML server OK"
 
-echo "[10/11] Starting Remediation Engine (Slack/PagerDuty from Vault)..."
+echo "[12/13] Starting standalone Remediation Engine on host (Slack/PagerDuty/GitHub from Vault)..."
 fuser -k 8082/tcp 2>/dev/null || true
 pkill -f remediation-test 2>/dev/null || true
 sleep 2
@@ -122,14 +144,14 @@ PAGERDUTY_ROUTING_KEY="$PD_KEY" \
 nohup /tmp/remediation-test > /tmp/remediation.log 2>&1 &
 cd ~/infraguard
 sleep 3
-curl -s http://localhost:8082/healthz && echo " Remediation engine OK"
+curl -s http://localhost:8082/healthz && echo " Remediation engine (host) OK"
 
-echo "[11/11] Starting React Dashboard..."
+echo "[13/13] Starting React Dashboard..."
 fuser -k 3000/tcp 2>/dev/null || true
 sleep 1
 cd dashboard
 if [ ! -f package.json ] || ! grep -q '"start"' package.json 2>/dev/null; then
-  echo "  Dashboard package.json missing/broken — skipping. Run create-react-app manually."
+  echo "  Dashboard package.json missing/broken — skipping."
 else
   nohup npm start > /tmp/dashboard.log 2>&1 &
   cd ~/infraguard
@@ -145,16 +167,21 @@ sudo ufw allow 3000/tcp 2>/dev/null || true
 sudo ufw allow 8080/tcp 2>/dev/null || true
 sudo ufw allow 8081/tcp 2>/dev/null || true
 sudo ufw allow 8082/tcp 2>/dev/null || true
+sudo ufw allow 9000/tcp 2>/dev/null || true
 
 VM_IP=$(hostname -I | awk '{print $1}')
 echo ""
 echo "=== Startup complete ==="
 echo "Drift Dashboard:  http://${VM_IP}:3000"
-echo "ArgoCD UI:        https://${VM_IP}:8081  (admin / see below)"
+echo "ArgoCD UI:        https://${VM_IP}:8081  (admin / password below)"
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 -d
 echo ""
 echo "ML server:        http://localhost:8001/docs"
 echo "MLflow:            http://localhost:5000"
 echo "Grafana:           http://${VM_IP}:3001  (admin/admin)"
 echo "Prometheus:        http://localhost:9090"
+echo "SonarQube:         http://${VM_IP}:9000  (admin / see: vault kv get -field=admin_password infraguard/sonarqube)"
+echo "Local Registry:    localhost:5001"
+echo "Helm release:"
+helm list
 cd ~/infraguard
